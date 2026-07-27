@@ -29,9 +29,13 @@ jobs:
 
       - name: Check shell scripts parse
         run: |
-          for f in hexstrike/setup.sh hexstrike/scripts/*.sh; do
+          for f in hexstrike/setup.sh hexstrike/install.sh \
+                   hexstrike/scripts/*.sh hexstrike/scripts/hexstrike; do
             bash -n "$f" && echo "ok  $f"
           done
+
+      - name: hexstrike --help works
+        run: hexstrike/scripts/hexstrike --help
 
       - name: Check Python scripts compile
         run: |
@@ -42,7 +46,8 @@ jobs:
       - name: Check scripts are executable
         run: |
           status=0
-          for f in hexstrike/setup.sh hexstrike/scripts/*.sh hexstrike/scripts/*.py; do
+          for f in hexstrike/setup.sh hexstrike/install.sh hexstrike/scripts/hexstrike \
+                   hexstrike/scripts/*.sh hexstrike/scripts/*.py; do
             if [ ! -x "$f" ]; then echo "not executable: $f"; status=1; fi
           done
           exit $status

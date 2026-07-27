@@ -19,7 +19,36 @@ What lives in git is the setup scripts and the client configuration.
 Both processes must be running for anything to work: the server as a long-lived
 process you start yourself, the MCP client spawned on demand by the AI client.
 
-## Setup
+## Quick start
+
+```bash
+./hexstrike/install.sh    # once - puts `hexstrike` on your PATH
+hexstrike                 # every time after that
+```
+
+`hexstrike` does the whole job: runs setup on first use, starts the server in
+the background, waits until it's actually healthy, refreshes your client configs
+and prints status. Run it again any time — if the server is already up it just
+reports and exits.
+
+| Command | |
+| --- | --- |
+| `hexstrike` | start everything, report status |
+| `hexstrike stop` / `restart` | stop / bounce the server |
+| `hexstrike status` | up? which port? how many tools? |
+| `hexstrike logs` | follow the server log |
+| `hexstrike tools` | which wrapped CLI tools are installed |
+| `hexstrike connect claude` | install the config into Claude Desktop |
+| `hexstrike setup` | re-run dependency setup |
+
+The server is detached, so it keeps running after you close the terminal. Your
+AI client spawns the MCP bridge itself — you never run `hexstrike_mcp.py` by
+hand.
+
+## Setup details
+
+`hexstrike` calls this for you on first run; use it directly to control the
+dependency set:
 
 ```bash
 ./hexstrike/setup.sh              # clone upstream + venv + deps + generate configs
@@ -39,7 +68,9 @@ Then install the CLI tools it wraps (optional — missing tools degrade graceful
 ./hexstrike/scripts/install-security-tools.sh --check   # what's already present
 ```
 
-Run the server, then verify:
+### Running the server in the foreground
+
+`hexstrike` backgrounds the server. To watch it directly instead:
 
 ```bash
 ./hexstrike/scripts/start-server.sh          # binds 127.0.0.1:8888
@@ -143,11 +174,13 @@ Read these before exposing this to an agent.
 
 ```
 hexstrike/
+├── install.sh                      # put `hexstrike` on your PATH
 ├── setup.sh                        # clone + venv + deps + configs
 ├── hexstrike.env.example           # port and API keys (copy to hexstrike.env)
 ├── configs/                        # reference templates (placeholder paths)
 │   └── generated/                  # real paths, written by setup.sh (gitignored)
 ├── scripts/
+│   ├── hexstrike                   # the one-word command
 │   ├── start-server.sh             # launcher wrapper (loopback by default)
 │   ├── hexstrike_local.py          # runs the app bound to a host you choose
 │   ├── verify.sh

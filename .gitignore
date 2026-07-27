@@ -12,3 +12,6 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
+
+# hexstrike runtime state (pid, logs)
+hexstrike/.run/

@@ -1,0 +1,212 @@
+#!/usr/bin/env bash
+#
+# hexstrike - one command to bring the whole stack up.
+#
+#   hexstrike            start everything (setup on first run) and report status
+#   hexstrike stop       stop the server
+#   hexstrike restart    stop then start
+#   hexstrike status     is it up, on what port, with how many tools
+#   hexstrike logs       follow the server log
+#   hexstrike tools      which wrapped CLI tools are installed
+#   hexstrike connect    (re)write client configs; `connect claude` installs them
+#   hexstrike setup      re-run dependency setup
+#
+# The server runs in the background and survives closing your terminal.
+# Your AI client launches the MCP bridge itself - you never start that by hand.
+#
+set -uo pipefail
+
+# --- locate the repo, even when invoked through a symlink on PATH ------------
+resolve() {
+  local p="$1"
+  while [ -L "$p" ]; do
+    local target; target="$(readlink "$p")"
+    case "$target" in
+      /*) p="$target" ;;
+      *)  p="$(cd "$(dirname "$p")" && pwd)/$target" ;;
+    esac
+  done
+  printf '%s' "$p"
+}
+SELF="$(resolve "${BASH_SOURCE[0]}")"
+ROOT="$(cd "$(dirname "$SELF")/.." && pwd)"
+
+RUN_DIR="${ROOT}/.run"
+PID_FILE="${RUN_DIR}/server.pid"
+LOG_FILE="${RUN_DIR}/server.log"
+VENV_PY="${ROOT}/hexstrike-env/bin/python3"
+LAUNCHER="${ROOT}/scripts/hexstrike_local.py"
+SRC="${ROOT}/vendor/hexstrike-ai"
+
+mkdir -p "$RUN_DIR"
+
+C_OK=$'\033[32m'; C_INFO=$'\033[36m'; C_WARN=$'\033[33m'; C_ERR=$'\033[31m'
+C_DIM=$'\033[2m'; C_BOLD=$'\033[1m'; C_OFF=$'\033[0m'
+info() { printf '%s[*]%s %s\n' "$C_INFO" "$C_OFF" "$*"; }
+ok()   { printf '%s[+]%s %s\n' "$C_OK" "$C_OFF" "$*"; }
+warn() { printf '%s[!]%s %s\n' "$C_WARN" "$C_OFF" "$*"; }
+err()  { printf '%s[x]%s %s\n' "$C_ERR" "$C_OFF" "$*" >&2; }
+
+# --- config ------------------------------------------------------------------
+if [ -f "${ROOT}/hexstrike.env" ]; then
+  # shellcheck disable=SC1091
+  set -a; source "${ROOT}/hexstrike.env"; set +a
+fi
+PORT="${HEXSTRIKE_PORT:-8888}"
+HOST="${HEXSTRIKE_HOST:-127.0.0.1}"
+URL="http://${HOST}:${PORT}"
+
+# --- helpers -----------------------------------------------------------------
+server_pid() {
+  [ -f "$PID_FILE" ] || return 1
+  local pid; pid="$(cat "$PID_FILE" 2>/dev/null)"
+  [ -n "$pid" ] || return 1
+  kill -0 "$pid" 2>/dev/null || return 1
+  printf '%s' "$pid"
+}
+
+is_healthy() { curl -fsS --max-time 3 "${URL}/health" >/dev/null 2>&1; }
+
+needs_setup() {
+  [ ! -x "$VENV_PY" ] || [ ! -f "${SRC}/hexstrike_server.py" ]
+}
+
+do_setup() {
+  info "First run - setting up (this takes a few minutes)"
+  "${ROOT}/setup.sh" "$@" || { err "setup failed"; exit 1; }
+}
+
+# --- commands ----------------------------------------------------------------
+cmd_start() {
+  if is_healthy; then
+    ok "Already running at ${URL}"
+    cmd_status
+    return 0
+  fi
+
+  # Stale pidfile from a crashed run.
+  if ! server_pid >/dev/null && [ -f "$PID_FILE" ]; then rm -f "$PID_FILE"; fi
+
+  needs_setup && do_setup
+
+  info "Starting server on ${URL}"
+  # setsid detaches from the terminal so the server outlives this shell.
+  if command -v setsid >/dev/null 2>&1; then
+    setsid "$VENV_PY" "$LAUNCHER" --host "$HOST" --port "$PORT" \
+      >"$LOG_FILE" 2>&1 < /dev/null &
+  else
+    nohup "$VENV_PY" "$LAUNCHER" --host "$HOST" --port "$PORT" \
+      >"$LOG_FILE" 2>&1 < /dev/null &
+  fi
+  echo $! > "$PID_FILE"
+
+  # Import of the upstream module is slow; give it room.
+  local waited=0
+  printf '%s' "${C_DIM}    waiting for health"
+  while [ "$waited" -lt 90 ]; do
+    if is_healthy; then printf '%s\n' "$C_OFF"; break; fi
+    if ! server_pid >/dev/null; then
+      printf '%s\n' "$C_OFF"
+      err "Server exited during startup. Last lines:"
+      tail -n 15 "$LOG_FILE" >&2
+      rm -f "$PID_FILE"
+      exit 1
+    fi
+    printf '.'; sleep 1; waited=$((waited + 1))
+  done
+
+  if ! is_healthy; then
+    printf '%s\n' "$C_OFF"
+    err "Server did not become healthy within ${waited}s. See: hexstrike logs"
+    exit 1
+  fi
+
+  ok "Server up (pid $(cat "$PID_FILE"))"
+  ensure_configs
+  cmd_status
+}
+
+cmd_stop() {
+  local pid
+  if pid="$(server_pid)"; then
+    info "Stopping server (pid ${pid})"
+    kill "$pid" 2>/dev/null
+    local waited=0
+    while [ "$waited" -lt 10 ] && kill -0 "$pid" 2>/dev/null; do sleep 1; waited=$((waited+1)); done
+    kill -0 "$pid" 2>/dev/null && { warn "Forcing"; kill -9 "$pid" 2>/dev/null; }
+    rm -f "$PID_FILE"
+    ok "Stopped"
+  else
+    rm -f "$PID_FILE"
+    info "Not running"
+  fi
+}
+
+cmd_status() {
+  if ! is_healthy; then
+    warn "Server is not running. Start it with: hexstrike"
+    return 1
+  fi
+  "$VENV_PY" - "$URL" <<'PY'
+import json, sys, urllib.request
+url = sys.argv[1]
+try:
+    d = json.load(urllib.request.urlopen(url + "/health", timeout=5))
+except Exception as exc:
+    sys.exit(f"could not read health: {exc}")
+have = d.get("total_tools_available", 0)
+total = d.get("total_tools_count", 0)
+up = int(d.get("uptime", 0))
+h, m, s = up // 3600, (up % 3600) // 60, up % 60
+print(f"\033[32m[+]\033[0m {url}  \033[2m(v{d.get('version','?')})\033[0m")
+print(f"    status     {d.get('status','?')}")
+print(f"    uptime     {h}h {m}m {s}s")
+print(f"    cli tools  {have}/{total} installed   \033[2m(hexstrike tools)\033[0m")
+PY
+  printf '    %sclient     restart your AI app if you just connected it%s\n' "$C_DIM" "$C_OFF"
+}
+
+cmd_logs() {
+  [ -f "$LOG_FILE" ] || { warn "No log yet at ${LOG_FILE}"; exit 1; }
+  tail -f -n 40 "$LOG_FILE"
+}
+
+cmd_tools() { "${ROOT}/scripts/install-security-tools.sh" --check; }
+
+ensure_configs() {
+  "$VENV_PY" "${ROOT}/scripts/generate-client-config.py" --write >/dev/null 2>&1 \
+    && info "Client configs refreshed in ${ROOT}/configs/generated/"
+}
+
+cmd_connect() {
+  local client="${1:-}"
+  case "$client" in
+    claude|claude-desktop) "$VENV_PY" "${ROOT}/scripts/generate-client-config.py" --install claude-desktop ;;
+    cursor)               "$VENV_PY" "${ROOT}/scripts/generate-client-config.py" --install cursor ;;
+    "")
+      "$VENV_PY" "${ROOT}/scripts/generate-client-config.py" --write
+      echo
+      info "Copy the file for your client, or let me install it:"
+      echo "      hexstrike connect claude     # Claude Desktop"
+      echo "      hexstrike connect cursor     # Cursor"
+      ;;
+    *) err "unknown client '${client}' (try: claude, cursor)"; exit 2 ;;
+  esac
+}
+
+# Print the header comment block: everything from line 2 up to the first line
+# that isn't a comment, with the leading '# ' stripped.
+usage() { awk 'NR==1 {next} /^#/ {sub(/^# ?/, ""); print; next} {exit}' "$SELF"; }
+
+case "${1:-start}" in
+  start|"")      cmd_start ;;
+  stop)          cmd_stop ;;
+  restart)       cmd_stop; cmd_start ;;
+  status)        cmd_status ;;
+  logs)          cmd_logs ;;
+  tools)         cmd_tools ;;
+  connect)       shift; cmd_connect "${1:-}" ;;
+  setup)         shift; do_setup "$@" ;;
+  -h|--help|help) usage ;;
+  *)             err "unknown command '${1}'"; echo; usage; exit 2 ;;
+esac
