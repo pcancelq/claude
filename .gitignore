@@ -15,3 +15,8 @@ venv/
 
 # hexstrike runtime state (pid, logs)
 hexstrike/.run/
+
+# Project-scoped MCP config copied out of configs/generated/. Machine-specific
+# absolute paths, so it must not be committed - regenerate it per machine with
+# `hexstrike connect`.
+.mcp.json
