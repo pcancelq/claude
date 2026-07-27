@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "hexstrike-ai": {
+      "command": "/path/to/hexstrike/hexstrike-env/bin/python3",
+      "args": [
+        "/path/to/hexstrike/vendor/hexstrike-ai/hexstrike_mcp.py",
+        "--server",
+        "http://localhost:8888"
+      ],
+      "description": "HexStrike AI - MCP bridge to the local HexStrike security server",
+      "timeout": 300,
+      "alwaysAllow": []
+    }
+  }
+}

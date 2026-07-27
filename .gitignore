@@ -1,0 +1,14 @@
+# HexStrike: upstream source, virtualenv and machine-specific config
+hexstrike/vendor/
+hexstrike/hexstrike-env/
+hexstrike/configs/generated/
+hexstrike/hexstrike.env
+
+# Local client config backups written by generate-client-config.py --install
+*.bak-*
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/

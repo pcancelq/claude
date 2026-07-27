@@ -1,0 +1,55 @@
+name: hexstrike config check
+
+on:
+  push:
+    paths:
+      - 'hexstrike/**'
+      - '.github/workflows/hexstrike-config-check.yml'
+  pull_request:
+    paths:
+      - 'hexstrike/**'
+      - '.github/workflows/hexstrike-config-check.yml'
+  workflow_dispatch:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate config templates are well-formed JSON
+        run: |
+          for f in hexstrike/configs/*.json; do
+            python3 -m json.tool "$f" > /dev/null && echo "ok  $f"
+          done
+
+      - name: Check shell scripts parse
+        run: |
+          for f in hexstrike/setup.sh hexstrike/scripts/*.sh; do
+            bash -n "$f" && echo "ok  $f"
+          done
+
+      - name: Check Python scripts compile
+        run: |
+          for f in hexstrike/scripts/*.py; do
+            python3 -m py_compile "$f" && echo "ok  $f"
+          done
+
+      - name: Check scripts are executable
+        run: |
+          status=0
+          for f in hexstrike/setup.sh hexstrike/scripts/*.sh hexstrike/scripts/*.py; do
+            if [ ! -x "$f" ]; then echo "not executable: $f"; status=1; fi
+          done
+          exit $status
+
+      - name: Config generator produces valid JSON for every client
+        run: |
+          for client in claude-desktop cursor 5ire claude-code vscode; do
+            python3 hexstrike/scripts/generate-client-config.py --print "$client" \
+              | python3 -m json.tool > /dev/null && echo "ok  $client"
+          done
