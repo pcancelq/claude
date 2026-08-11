@@ -39,8 +39,17 @@ That does three things:
 **Claude Code → Codex.** Registers Codex as a stdio MCP server:
 
 ```bash
-claude mcp add --scope user --transport stdio codex -- codex mcp-server
+claude mcp add --scope user --transport stdio codex -- \
+  codex -c approval_policy='"never"' \
+        -c sandbox_mode='"workspace-write"' \
+        -c sandbox_workspace_write.network_access=true \
+        mcp-server
 ```
+
+Root-level `-c` overrides are forwarded to `mcp-server`, so they configure this
+registration without touching your interactive `codex` sessions. See
+[section 3](#3-everyday-use--codex-in-all-your-work-not-just-hunt) for what the
+three values buy and cost.
 
 `codex mcp-server` starts Codex as a JSON-RPC server on stdio, exposing two
 tools — `codex` (start a session) and `codex-reply` (continue one by
@@ -112,7 +121,42 @@ your recon tools in `.claude/settings.json`:
 }
 ```
 
-## 3. The cross-check workflow
+## 3. Everyday use — Codex in all your work, not just `/hunt`
+
+`setup.sh` registers Codex at **user scope**, so `mcp__codex__codex` is live in
+every project and every session. Nothing gates it behind a skill: a skill's
+`allowed-tools` only pre-approves permission for that turn, it never restricts
+what is otherwise available. Your existing skills keep working exactly as they
+did, and any of them can reach Codex.
+
+What was missing is that Claude has no reason to *think* of delegating. That's
+what `delegation.md` fixes — `setup.sh` installs it into `~/.claude/CLAUDE.md`,
+so the policy is in context for every project. It covers when handing work to
+Codex is worth the round trip, when it isn't, and how to read the answer that
+comes back. Re-running `setup.sh` replaces the block in place rather than
+stacking copies, and leaves the rest of your memory file untouched.
+
+The registration also gives Codex enough rope to be useful:
+
+```
+approval_policy = never            # no human in the MCP loop to approve
+sandbox_mode    = workspace-write  # can run commands and write in the cwd
+network_access  = true
+```
+
+These apply **only to the MCP registration** — your interactive `codex`
+sessions still follow `~/.codex/config.toml`. If you'd rather Codex only ever
+analyze, install with `CODEX_SANDBOX=read-only ./dual-agent/setup.sh`. Claude
+can also narrow any individual call by passing `sandbox: "read-only"` to the
+tool, which is the right setting for a second opinion.
+
+Understand what `workspace-write` + `approval_policy = never` means before you
+accept the default: Codex executes commands in the working directory without
+asking you first. That is the price of it being useful unattended. It cannot
+reach outside the working directory, and `danger-full-access` is deliberately
+not offered by the installer.
+
+## 4. The cross-check workflow
 
 ```bash
 ./dual-agent/crosscheck.sh -s scope.json -e ./evidence \
@@ -127,7 +171,7 @@ to split the difference. Output lands in `crosscheck-<timestamp>/`:
 Flags: `-n` for offline/static analysis with no scope file, `-N` to allow Codex
 network access, `-f` to read the task from a file.
 
-## 4. Skills and the scope gate
+## 5. Skills and the scope gate
 
 Skills and MCP are orthogonal — a skill is just instructions, and it can drive
 MCP tools like any other. `.claude/skills/hunt/SKILL.md` gives you `/hunt`, which
@@ -157,7 +201,7 @@ Critically, it also gates `mcp__codex__*` calls. Codex runs in its own process
 where this hook does not apply, so the delegation prompt is the last checkpoint
 before work leaves Claude's control.
 
-## 5. Division of labor
+## 6. Division of labor
 
 Point each agent at what it's better at rather than running both on everything:
 
