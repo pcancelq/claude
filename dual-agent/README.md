@@ -179,7 +179,7 @@ pre-approves the recon tooling plus `mcp__codex__codex` for its turn and walks
 the map → candidates → prove → verify → write-up loop.
 
 ```
-/hunt scope.json api.example.net
+/hunt api.example.net
 ```
 
 One asymmetry: **skills are Claude Code only.** Codex doesn't read

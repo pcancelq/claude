@@ -1,8 +1,8 @@
 ---
 name: hunt
-description: Run a scoped bug bounty / pentest hunt against a target, delegating PoC construction to Codex and cross-verifying findings before reporting. Use when the user gives a scope file and a target to test.
-argument-hint: "[scope-file] [target-or-focus]"
-arguments: [scope, target]
+description: Run a scoped bug bounty / pentest hunt against a target, delegating PoC construction to Codex and cross-verifying findings before reporting. Takes the target first; reads ./scope.json unless a scope file is given as the second argument.
+argument-hint: "[target] [scope-file (default ./scope.json)]"
+arguments: [target, scope]
 allowed-tools:
   - Read
   - Grep
@@ -23,13 +23,27 @@ allowed-tools:
 
 # Scoped hunt
 
-Scope file: `$scope` (default `./scope.json` if empty)
 Target / focus: `$target`
+Scope file: `$scope` — if that is empty, use `./scope.json`.
 
 ## 0. Gate
 
-Read the scope file first. If it is missing, stop and ask — do not improvise a
-scope. Restate in one line what is in scope and what is excluded, then proceed.
+Read the scope file first, before anything else.
+
+Stop and ask if any of these is true:
+
+- The scope file does not exist.
+- It is still the unedited template (`engagement: "example-program"`, or
+  `example.com` in `in_scope.domains`).
+- `$target` is not covered by `in_scope`.
+
+In each case say plainly what is wrong and what needs to go in the file. Do not
+improvise a scope, do not guess that the target is probably fine, and do not
+send a single request until it is fixed — `scope-guard.py` would block you
+anyway, and burning turns on denied commands helps nobody.
+
+Once it is valid, restate in one line what is in scope and what is excluded,
+then proceed.
 
 `.claude/hooks/scope-guard.py` independently blocks out-of-scope traffic. Treat
 a `scope-guard: BLOCKED` message as final: do not rephrase the command, do not
@@ -75,7 +89,7 @@ anything to the target.
 Anything you intend to report goes through independent verification:
 
 ```
-./dual-agent/crosscheck.sh -s $scope -e ./evidence "<the specific claim>"
+./dual-agent/crosscheck.sh -s <the scope file from step 0> -e ./evidence "<the specific claim>"
 ```
 
 Do not paste your own reasoning into that prompt. The value is that the second
