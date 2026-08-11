@@ -11,6 +11,7 @@ allowed-tools:
   - TodoWrite
   - mcp__codex__codex
   - mcp__codex__codex-reply
+  - Bash(./dual-agent/mkscope.py:*)
   - Bash(httpx:*)
   - Bash(subfinder:*)
   - Bash(nuclei:*)
@@ -28,22 +29,36 @@ Scope file: `$scope` — if that is empty, use `./scope.json`.
 
 ## 0. Gate
 
-Read the scope file first, before anything else.
+Before anything else, get a valid scope file on disk. `scope-guard.py` enforces
+that file, not this conversation — a scope I only told you about stops nothing.
 
-Stop and ask if any of these is true:
+**If the scope file already exists and covers `$target`:** restate in one line
+what is in scope and what is excluded, then go to step 1.
 
-- The scope file does not exist.
-- It is still the unedited template (`engagement: "example-program"`, or
-  `example.com` in `in_scope.domains`).
-- `$target` is not covered by `in_scope`.
+**Otherwise, build it from what I gave you.** Do not ask me to write JSON.
 
-In each case say plainly what is wrong and what needs to go in the file. Do not
-improvise a scope, do not guess that the target is probably fine, and do not
-send a single request until it is fixed — `scope-guard.py` would block you
-anyway, and burning turns on denied commands helps nobody.
+```
+./dual-agent/mkscope.py <targets...> [--exclude host] [--rps N] [--header 'X-Bug-Bounty: handle']
+```
 
-Once it is valid, restate in one line what is in scope and what is excluded,
-then proceed.
+Take the targets from `$target` and from anything I typed alongside it. A bare
+domain like `target.com` almost always means the wildcard too, so pass
+`'*.target.com'` unless I said otherwise. Add `--force` only if a scope file
+exists and I have said to replace it.
+
+Then show me the generated scope in full and ask one question:
+
+> This authorizes testing against `<targets>` at `<N>` req/s. Confirm this
+> matches the program's actual scope before I send any traffic.
+
+Wait for my answer. Nothing before this point touches the network, so there is
+no rush — and this confirmation is the only thing standing between a typo and
+traffic to somebody else's host. If I correct the scope, regenerate with
+`--force` and ask again.
+
+**If it is still the unedited example template** (`engagement:
+"example-program"`, or `example.com` in `in_scope.domains`), treat it as absent
+and regenerate rather than hunting against the sample data.
 
 `.claude/hooks/scope-guard.py` independently blocks out-of-scope traffic. Treat
 a `scope-guard: BLOCKED` message as final: do not rephrase the command, do not

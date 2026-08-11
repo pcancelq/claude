@@ -182,6 +182,17 @@ the map → candidates → prove → verify → write-up loop.
 /hunt api.example.net
 ```
 
+You do not have to write `scope.json` by hand. If it is missing, step 0 builds
+it from what you typed with `dual-agent/mkscope.py`, shows you the result, and
+asks for one confirmation before any traffic goes out. That confirmation is the
+authorization checkpoint — the generated file is what the hook then enforces, so
+a typo caught there is a typo that never reaches somebody else's host.
+
+```bash
+# same thing, standalone
+./dual-agent/mkscope.py '*.target.com' 203.0.113.0/24 --exclude blog.target.com --rps 3
+```
+
 One asymmetry: **skills are Claude Code only.** Codex doesn't read
 `.claude/skills/`; its equivalent is `~/.codex/prompts/*.md` (now deprecated) or
 its plugin system. That's fine here because Claude is the orchestrator — Codex
