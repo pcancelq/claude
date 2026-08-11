@@ -121,7 +121,7 @@ your recon tools in `.claude/settings.json`:
 }
 ```
 
-## 3. Everyday use — Codex in all your work, not just `/hunt`
+## 3. Everyday use — Codex in all your work, not just `/BugHunter`
 
 `setup.sh` registers Codex at **user scope**, so `mcp__codex__codex` is live in
 every project and every session. Nothing gates it behind a skill: a skill's
@@ -174,12 +174,12 @@ network access, `-f` to read the task from a file.
 ## 5. Skills and the scope gate
 
 Skills and MCP are orthogonal — a skill is just instructions, and it can drive
-MCP tools like any other. `.claude/skills/hunt/SKILL.md` gives you `/hunt`, which
+MCP tools like any other. `.claude/skills/BugHunter/SKILL.md` gives you `/BugHunter`, which
 pre-approves the recon tooling plus `mcp__codex__codex` for its turn and walks
 the map → candidates → prove → verify → write-up loop.
 
 ```
-/hunt api.example.net
+/BugHunter api.example.net
 ```
 
 You do not have to write `scope.json` by hand. If it is missing, step 0 builds

@@ -1,5 +1,5 @@
 ---
-name: hunt
+name: BugHunter
 description: Run a scoped bug bounty / pentest hunt against a target, delegating PoC construction to Codex and cross-verifying findings before reporting. Takes the target first; reads ./scope.json unless a scope file is given as the second argument.
 argument-hint: "[target] [scope-file (default ./scope.json)]"
 arguments: [target, scope]
@@ -22,7 +22,7 @@ allowed-tools:
   - Bash(jq:*)
 ---
 
-# Scoped hunt
+# BugHunter — scoped pentest / bug bounty run
 
 Target / focus: `$target`
 Scope file: `$scope` — if that is empty, use `./scope.json`.
