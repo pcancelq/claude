@@ -1,0 +1,48 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(httpx:*)",
+      "Bash(subfinder:*)",
+      "Bash(nuclei:*)",
+      "Bash(ffuf:*)",
+      "Bash(katana:*)",
+      "Bash(dig:*)",
+      "Bash(curl:*)",
+      "Bash(jq:*)",
+      "Read(./evidence/**)",
+      "Write(./evidence/**)",
+      "Write(./findings/**)",
+      "Write(./notes/**)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Read(./.env)",
+      "Read(./**/*.pem)",
+      "Read(./**/id_rsa*)",
+      "Read(~/.aws/**)",
+      "Read(~/.ssh/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/scope-guard.py"
+          }
+        ]
+      },
+      {
+        "matcher": "mcp__codex__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PROJECT_DIR}/.claude/hooks/scope-guard.py"
+          }
+        ]
+      }
+    ]
+  }
+}

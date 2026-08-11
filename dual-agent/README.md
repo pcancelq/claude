@@ -113,7 +113,37 @@ to split the difference. Output lands in `crosscheck-<timestamp>/`:
 Flags: `-n` for offline/static analysis with no scope file, `-N` to allow Codex
 network access, `-f` to read the task from a file.
 
-## 4. Division of labor
+## 4. Skills and the scope gate
+
+Skills and MCP are orthogonal — a skill is just instructions, and it can drive
+MCP tools like any other. `.claude/skills/hunt/SKILL.md` gives you `/hunt`, which
+pre-approves the recon tooling plus `mcp__codex__codex` for its turn and walks
+the map → candidates → prove → verify → write-up loop.
+
+```
+/hunt scope.json api.example.net
+```
+
+One asymmetry: **skills are Claude Code only.** Codex doesn't read
+`.claude/skills/`; its equivalent is `~/.codex/prompts/*.md` (now deprecated) or
+its plugin system. That's fine here because Claude is the orchestrator — Codex
+gets its rules from `AGENTS.md` and from the prompt Claude sends it.
+
+The scope rules in `AGENTS.md` are only instructions, and an agent hunting for
+an hour will drift. `.claude/hooks/scope-guard.py` is the actual enforcement: a
+`PreToolUse` hook that extracts target hosts from every Bash/WebFetch call,
+matches them against `scope.json` (wildcards, CIDRs, `out_of_scope` overriding
+`in_scope`), and denies anything that doesn't match. It fails closed — a network
+command whose target it can't parse gets blocked too.
+
+It only ever *subtracts* permission. In-scope hosts return `defer`, so your
+normal `settings.json` rules still apply rather than being silently bypassed.
+
+Critically, it also gates `mcp__codex__*` calls. Codex runs in its own process
+where this hook does not apply, so the delegation prompt is the last checkpoint
+before work leaves Claude's control.
+
+## 5. Division of labor
 
 Point each agent at what it's better at rather than running both on everything:
 
@@ -128,6 +158,9 @@ Claude validates it against the evidence; `crosscheck.sh` runs on anything
 you're about to actually report.
 
 ## Caveats
+
+**These files live in the repo, not on your machine.** Clone or pull this branch
+on the box you actually test from; `setup.sh` is what wires that machine.
 
 **Recursion.** Both directions are live, so Claude can call Codex which can call
 Claude. Nothing in MCP stops that. `AGENTS.md` sets a one-hop rule; keep it.
