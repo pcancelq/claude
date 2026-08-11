@@ -10,7 +10,10 @@ No scope file  ->  no decision (you are not on an engagement; normal rules apply
 
 IMPORTANT: this guards Claude's own tool calls only. Work delegated to Codex
 runs in Codex's process, outside this hook, which is why delegation prompts are
-scanned too - see check_delegation().
+scanned too - see the mcp__codex__ branch in main().
+
+This hook only ever subtracts permission. An in-scope target returns no
+decision, so the allow/deny rules in settings.json still apply normally.
 """
 
 import ipaddress
