@@ -1,0 +1,33 @@
+{
+  "engagement": "example-program",
+  "authorization": {
+    "type": "bug-bounty",
+    "reference": "https://hackerone.com/example/policy",
+    "authorized_by": "public program policy",
+    "valid_until": "2026-12-31"
+  },
+  "in_scope": {
+    "domains": ["*.example.com", "api.example.net"],
+    "ips": ["203.0.113.0/24"],
+    "mobile": ["com.example.android"]
+  },
+  "out_of_scope": {
+    "domains": ["blog.example.com", "*.corp.example.com"],
+    "findings": [
+      "self-XSS",
+      "missing security headers without demonstrated impact",
+      "rate limiting on non-authentication endpoints",
+      "clickjacking on unauthenticated pages"
+    ]
+  },
+  "rules": {
+    "max_requests_per_second": 5,
+    "no_automated_scanners": false,
+    "no_dos": true,
+    "no_social_engineering": true,
+    "no_data_exfiltration": true,
+    "pii_handling": "stop at proof of access, never dump records",
+    "required_header": "X-Bug-Bounty: researcher-handle"
+  },
+  "notes": "Agents must refuse any target not matching in_scope. Destructive verbs (DELETE, DROP, shutdown) require explicit human confirmation."
+}
