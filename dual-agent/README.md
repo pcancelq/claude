@@ -3,6 +3,20 @@
 Two CLI agents on the same Linux box, able to call each other over MCP, sharing
 one instruction file and one engagement scope.
 
+## Install on the testing box
+
+Nothing here affects a machine until you run `setup.sh` on it.
+
+```bash
+git fetch origin claude/cloud-code-codex-integration-nlgtea
+git checkout claude/cloud-code-codex-integration-nlgtea
+./dual-agent/setup.sh
+
+# recon tooling the allowlist and scope guard assume is on PATH
+# (Kali: most are in the repos, the rest via go install)
+which httpx subfinder nuclei ffuf katana dig jq
+```
+
 ## Why bother
 
 Not because two agents are twice as fast — they aren't. Because in bug bounty

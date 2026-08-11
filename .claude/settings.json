@@ -4,11 +4,12 @@
       "Bash(httpx:*)",
       "Bash(subfinder:*)",
       "Bash(nuclei:*)",
-      "Bash(ffuf:*)",
       "Bash(katana:*)",
+      "Bash(ffuf:*)",
       "Bash(dig:*)",
       "Bash(curl:*)",
       "Bash(jq:*)",
+      "Bash(whatweb:*)",
       "Read(./evidence/**)",
       "Write(./evidence/**)",
       "Write(./findings/**)",
@@ -16,11 +17,15 @@
     ],
     "deny": [
       "Bash(rm -rf:*)",
+      "Bash(hydra:*)",
+      "Bash(medusa:*)",
       "Read(./.env)",
       "Read(./**/*.pem)",
       "Read(./**/id_rsa*)",
+      "Read(~/.ssh/**)",
       "Read(~/.aws/**)",
-      "Read(~/.ssh/**)"
+      "Read(~/.codex/auth.json)",
+      "Read(~/.claude.json)"
     ]
   },
   "hooks": {
