@@ -1,0 +1,101 @@
+TITLE
+-----
+abbreviato <= 3.3.0: CDATA escapes a dropped element unescaped, turning inert <style> text into live HTML
+
+
+SUMMARY
+-------
+Target:   https://github.com/zendesk/abbreviato
+Affected: abbreviato 3.3.0 and earlier
+File:     lib/abbreviato/truncated_sax_document.rb
+
+When an element's opening tag doesn't fit the byte budget, abbreviato drops it by
+entering "ignore mode". The `characters` and `end_element` callbacks respect that
+mode. The `cdata_block` callback (line 103) does not -- and it appends its content
+to the output with no escaping at all.
+
+So if a <div> is dropped, the <style> tag inside it is suppressed, but the <style>
+body is still written out, raw, at top level. Text that was CSS inside <style>
+becomes live HTML.
+
+Why it matters: inside <style>, `<img src=x onerror=...>` is CSS text, not an
+element. A sanitizer that allows <style> (normal for email/ticket HTML) correctly
+leaves it alone -- there's no element to strip. After truncation those same bytes
+are top-level HTML and the browser parses them as an <img> with an event handler.
+Any pipeline that sanitizes and then truncates can emit markup its sanitizer
+deliberately passed.
+
+Preconditions: truncation must run after sanitization, and the sanitizer must
+allow <style>. I have not enumerated Zendesk's internal callers; this is reported
+against the public gem.
+
+The same missing check in `comment` (line 84) leaks comments out of dropped
+elements too -- same bug, same fix.
+
+
+PROOF OF CONCEPT
+----------------
+    gem install abbreviato activesupport
+    ruby abbreviato_cdata_escape.rb
+
+Script:
+
+    require "active_support/core_ext/object/blank"
+    require "abbreviato"
+    require "nokogiri"
+
+    PAD   = "padding-" * 8
+    INERT = '<div class="' + PAD + '"><style>.a{color:red}' \
+            '<img src=x onerror=alert(document.domain)></style></div>'
+
+    out, = Abbreviato.truncate(INERT, max_length: 60, tail: "")
+
+    puts Nokogiri::HTML.fragment(INERT).css("img").length         # => 0
+    puts out
+    puts Nokogiri::HTML.fragment(out).css("img[onerror]").length  # => 1
+
+Input (the <img> is CSS text inside <style> -- what a sanitizer passes untouched):
+
+    <div class="padding-padding-padding-padding-padding-padding-padding-padding-"><style>.a{color:red}<img src=x onerror=alert(document.domain)></style></div>
+
+Output:
+
+    .a{color:red}<img src=x onerror=alert(document.domain)>
+
+Result on abbreviato 3.3.0 / Ruby 3.3.6:
+
+    live <img> in input:                 0
+    live <img onerror> in output:        1
+    <style> wrapper still present:       false
+
+Zero live image elements in, one live <img onerror> out.
+
+(activesupport is needed because abbreviato calls String#blank? without declaring
+the dependency; in a Rails host it's already loaded.)
+
+
+REMEDIATION
+-----------
+Check ignore mode in both callbacks, the way `characters` already does:
+
+    def comment(string)
+      if max_length_reached? || ignore_mode?
+        @truncated = true
+        return
+      end
+      # ... existing body
+    end
+
+    def cdata_block(string)
+      if max_length_reached? || ignore_mode?
+        @truncated = true
+        return
+      end
+      # ... existing body
+    end
+
+Also: `cdata_block` should never append raw bytes. CDATA is only safe inside the
+element it came from -- if that element isn't emitted, escape it or drop it.
+
+Workaround for consumers until a fix ships: truncate before sanitizing, or strip
+<style> before truncating.
