@@ -20,13 +20,21 @@ APPLY=0
 
 # اختصار تبديل اللغة. غيّره هنا لو رغبت باختصار آخر؛
 # القائمة الكاملة: grep 'grp:' /usr/share/X11/xkb/rules/evdev.lst
-#   grp:rctrl_rshift_toggle  Ctrl الأيمن + Shift الأيمن   (الافتراضي)
+#   grp:alt_shift_toggle     Alt + Shift                  (الافتراضي)
+#   grp:rctrl_rshift_toggle  Ctrl الأيمن + Shift الأيمن
 #   grp:lctrl_lshift_toggle  Ctrl الأيسر + Shift الأيسر
 #   grp:ctrl_shift_toggle    أي Ctrl + أي Shift
-#   grp:alt_shift_toggle     Alt + Shift
 #   grp:win_space_toggle     Super + مسافة
-SWITCH_OPT="${SWITCH_OPT:-grp:rctrl_rshift_toggle}"
-SWITCH_LABEL="Ctrl الأيمن + Shift الأيمن"
+SWITCH_OPT="${SWITCH_OPT:-grp:alt_shift_toggle}"
+
+case "$SWITCH_OPT" in
+    grp:alt_shift_toggle)     SWITCH_LABEL="Alt + Shift" ;;
+    grp:rctrl_rshift_toggle)  SWITCH_LABEL="Ctrl الأيمن + Shift الأيمن" ;;
+    grp:lctrl_lshift_toggle)  SWITCH_LABEL="Ctrl الأيسر + Shift الأيسر" ;;
+    grp:ctrl_shift_toggle)    SWITCH_LABEL="Ctrl + Shift" ;;
+    grp:win_space_toggle)     SWITCH_LABEL="Super + مسافة" ;;
+    *)                        SWITCH_LABEL="$SWITCH_OPT" ;;
+esac
 
 # ---------- عرض ----------
 c_ok=$'\e[32m'; c_warn=$'\e[33m'; c_err=$'\e[31m'; c_hdr=$'\e[1;36m'; c_off=$'\e[0m'
