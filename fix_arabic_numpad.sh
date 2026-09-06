@@ -18,6 +18,16 @@ set -uo pipefail
 APPLY=0
 [[ "${1:-}" == "--apply" ]] && APPLY=1
 
+# اختصار تبديل اللغة. غيّره هنا لو رغبت باختصار آخر؛
+# القائمة الكاملة: grep 'grp:' /usr/share/X11/xkb/rules/evdev.lst
+#   grp:rctrl_rshift_toggle  Ctrl الأيمن + Shift الأيمن   (الافتراضي)
+#   grp:lctrl_lshift_toggle  Ctrl الأيسر + Shift الأيسر
+#   grp:ctrl_shift_toggle    أي Ctrl + أي Shift
+#   grp:alt_shift_toggle     Alt + Shift
+#   grp:win_space_toggle     Super + مسافة
+SWITCH_OPT="${SWITCH_OPT:-grp:rctrl_rshift_toggle}"
+SWITCH_LABEL="Ctrl الأيمن + Shift الأيمن"
+
 # ---------- عرض ----------
 c_ok=$'\e[32m'; c_warn=$'\e[33m'; c_err=$'\e[31m'; c_hdr=$'\e[1;36m'; c_off=$'\e[0m'
 say()  { printf '%s\n' "$*"; }
@@ -105,12 +115,12 @@ else
     if [[ "$SUDO" != "SKIP" ]]; then
         # us أولًا حتى تكون المجموعة الافتراضية لاتينية، و ara بالمتغيّر الأساسي
         # (basic) الذي لا يتضمّن digits_KP إطلاقًا.
-        $SUDO tee /etc/default/keyboard >/dev/null <<'EOF'
+        $SUDO tee /etc/default/keyboard >/dev/null <<EOF
 # ضبطه fix_arabic_numpad.sh
 XKBMODEL="pc105"
 XKBLAYOUT="us,ara"
 XKBVARIANT=",basic"
-XKBOPTIONS="grp:alt_shift_toggle"
+XKBOPTIONS="$SWITCH_OPT"
 BACKSPACE="guess"
 EOF
         ok "كُتب /etc/default/keyboard (us,ara — المتغيّر basic بلا digits_KP)"
@@ -127,8 +137,8 @@ hdr "2/3 — تطبيق فوري على الجلسة الحالية"
 
 if [[ "$SESSION" == "x11" ]] && command -v setxkbmap >/dev/null 2>&1; then
     if setxkbmap -layout "us,ara" -variant ",basic" -option "" \
-                 -option "grp:alt_shift_toggle" 2>/dev/null; then
-        ok "طُبِّق التخطيط على الجلسة الحالية (تبديل اللغة: Alt+Shift)"
+                 -option "$SWITCH_OPT" 2>/dev/null; then
+        ok "طُبِّق التخطيط على الجلسة الحالية (تبديل اللغة: $SWITCH_LABEL)"
     else
         err "فشل setxkbmap"
     fi
@@ -210,7 +220,7 @@ EOF
 
     if command -v gsettings >/dev/null 2>&1; then
         gsettings set org.gnome.desktop.input-sources xkb-options \
-            "['grp:alt_shift_toggle','custom:latinkp']" 2>/dev/null \
+            "['$SWITCH_OPT','custom:latinkp']" 2>/dev/null \
             && ok "فُعِّل خيار custom:latinkp" \
             || warn "تعذّر تفعيل الخيار عبر gsettings"
     fi
@@ -221,6 +231,7 @@ fi
 # ---------- 5. الخلاصة ----------
 hdr "تم"
 say "جرّب الآن الكتابة من لوحة الأرقام الجانبية (تأكد أن NumLock مضاء)."
+say "وتبديل اللغة صار على: $SWITCH_LABEL"
 say ""
 say "إذا ما زالت الأرقام هندية، سجّل خروجًا ودخولًا — بعض التغييرات"
 say "لا تسري إلا على جلسة جديدة."
